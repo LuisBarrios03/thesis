@@ -3,40 +3,45 @@
 ## **Overview**
 
 The application exposes a flag through a PHP page protected by HTTP Basic Authentication.  
-While the web layer correctly enforces authentication, the challenge environment allows direct access to the Docker container, enabling the attacker to bypass the authentication mechanism entirely and retrieve the flag.
+Although the web layer correctly enforces authentication, the environment allows direct access to the Docker container, enabling a complete bypass of the protection mechanism.
 
 ## **Root Cause**
 
-The vulnerability exists because the system assumes that the attacker is restricted to interacting with the application through the web interface.
+The vulnerability exists because the system assumes that the attacker can only interact with the application through the web interface.
 
-However, since the application is deployed inside a locally accessible Docker container, this assumption is invalid.  
-An attacker with access to the container can directly inspect the filesystem and bypass all web-based access controls.
+However, the application is deployed inside a locally accessible Docker container.  
+This allows an attacker to bypass the web server authentication and directly access the application files.
 
 ## **Exploit Steps**
 
 1.  Identify the running container:  
-    docker ps
+    <br/>docker ps  
+    
 2.  Access the container shell:  
-    docker exec -it &lt;container_id&gt; /bin/bash
-3.  Navigate to the web root and inspect files:  
-    cd /var/www/html  
-    ls -la
-4.  Read the application files and retrieve the flag.
+    <br/>docker exec -it &lt;container_id&gt; /bin/bash  
+    
+3.  Navigate to the web root and inspect files:
+
+ls -la  
+cat index.php  
+
+1.  Retrieve the flag directly from the application output or file content.
 
 ## **Technical Details**
 
 - **Requests used**
-    - curl requests were used to test:
-        - HTTP methods (OPTIONS, HEAD)
+    - HTTP requests were tested using curl:
+        - OPTIONS
+        - HEAD
         - path variations (/index.php, /./index.php, //index.php)
-    - All returned 401 Unauthorized or 403 Forbidden
+    - All responses returned 401 Unauthorized or 403 Forbidden
 - **Parameters manipulated**
     - HTTP method
     - URL path structure
 - **Logic exploited**
-    - The application relies entirely on Apache Basic Auth
+    - Authentication is enforced only at the Apache level (.htaccess)
     - No protection exists at the environment level
-    - Direct container access bypasses authentication completely
+    - Direct access to the container bypasses authentication entirely
 
 ## **Impact**
 
@@ -44,29 +49,25 @@ An attacker can:
 
 - bypass authentication without valid credentials
 - access protected application files
-- retrieve sensitive data (e.g., the flag)
+- retrieve sensitive data (the flag)
 - fully compromise the application environment
 
 ## **Mitigation**
 
-- Do not rely solely on web server authentication when distributing the full runtime environment
-- Restrict or isolate access to the Docker container
-- Avoid storing sensitive data in accessible filesystem locations
-- Design challenges (or systems) assuming that local access may be possible
+- Do not rely only on web server authentication when the runtime environment is accessible
+- Restrict access to the Docker container
+- Avoid storing sensitive data in easily accessible files
+- Design systems assuming that local access may be possible
 
 ## **Key Insight**
 
-The main takeaway is that security mechanisms are only effective within the assumptions they are built on.  
-Once those assumptions are broken (e.g., by gaining container access), the protection becomes meaningless.
+Security mechanisms are only effective within the assumptions they rely on.  
+If those assumptions are broken (e.g., by accessing the container), the protection becomes ineffective.
 
 ## **Relation to Business Logic**
 
-This is a business logic flaw because the system’s security model is based on an incorrect assumption about attacker behavior.
-
-The application enforces the rule:
-
-"Only authenticated users can access the flag"
+This is a business logic flaw because the system assumes that only authenticated users can access the flag through the web interface.
 
 However, the deployment allows an alternative path (direct container access) that bypasses this rule entirely.
 
-Therefore, the vulnerability is not due to a technical misconfiguration in Apache or PHP, but due to flawed assumptions in the system design.
+The issue is not a technical misconfiguration, but a flawed assumption in the system design.
