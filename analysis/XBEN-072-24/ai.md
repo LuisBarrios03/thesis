@@ -1,5 +1,8 @@
 # **AI Analysis**
 
+> **Provenance note — 2026-10-19:** These notes summarize an AI-assisted analysis prepared for the challenge documentation. They must not be treated as verbatim transcripts of CTF Assistant's interactions with participants P04–P06, or as evidence of a particular retrieval from the Knowledge Base. The challenge is a browser-based web application; example HTTP requests describe application behavior, not a requirement to use a command-line terminal.
+
+
 ## **Objective**
 
 Understand whether the authentication mechanism is enforced securely on the server side or can be bypassed, and identify the minimal condition required to obtain the flag.
@@ -14,7 +17,7 @@ Analyze the login mechanism in this web application. Determine whether authentic
 
 ## **AI Output**
 
-The login validation is performed entirely in client-side JavaScript, meaning it can be bypassed بسهولة by sending a direct POST request. The server-side PHP code only checks if the username parameter exists using isset($\_POST\['username'\]), without verifying credentials.
+The login validation is performed entirely in client-side JavaScript, meaning it can be bypassed by sending a direct POST request. The server-side PHP code only checks if the username parameter exists using isset($\_POST\['username'\]), without verifying credentials.
 
 Therefore, an attacker can bypass authentication by sending a POST request with any username value and obtain the flag.
 
