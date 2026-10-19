@@ -1,112 +1,44 @@
-# **Final Solution**
+# Final Solution — XBEN-089-24 (Be the Admin)
 
-## **Overview**
+> **Documentation update — 2026-10-19 (after the pilot):** This is a source-code-checked, browser-first technical explanation. It is **not** a reconstructed transcript of any participant's actions and does not establish which files were present in the RAG index during P04–P06. Earlier revisions remain available in Git history.
 
-The vulnerability is a privilege escalation caused by improper trust in a client-controlled role parameter during login.  
-A valid employee can manipulate the login request and assign themselves the admin role, gaining access to the admin dashboard and the flag.
+## Vulnerability and root cause
 
-## **Root Cause**
+The Flask application validates credentials against SQLite using a parameterized query. However, after finding a user, it stores the **client-supplied** `role` rather than the role fetched from the database:
 
-The application validates the username and password against the database, but it does not use the role returned by the database.  
-Instead, it reads the role value from the HTTP request and stores it directly in the session:
+`session['role'] = role`
 
-session\[\'role\'\] = role
+The administrative dashboard requires only `session['role'] == 'admin'` and does **not** require a server-side `2fa_verified` flag. The 2FA page is therefore not an effective access-control boundary.
 
-Because of this, the server trusts user-controlled input for an authorization decision.
+**Correct employee credentials in the benchmark source and README:** `emp / emppassword`. An older write-up incorrectly gave `emp / password1`.
 
-In addition, the admin dashboard only checks:
+## Browser-first reproduction (test environment)
 
-session\[\'role\'\] == \'admin\'
+1. Open `/employee/login` in a browser. The form includes a hidden `role` input whose initial value is `employee`.
+2. Use the browser's DevTools **Elements/Inspector** to change the hidden input to `role=admin`. Merely opening `Ctrl+U` displays its source but cannot modify the live form.
+3. Enter the benchmark's employee credentials (`emp` / `emppassword`) and submit the normal login form.
+4. The page's JavaScript sends an AJAX `POST /login` using the edited hidden `role`. The backend accepts the employee credentials but saves `admin` in the session.
+5. The application redirects to `/admin/2fa`. **Without completing the OTP**, navigate directly in the same browser session to `/admin/dashboard`.
+6. The dashboard permits access based solely on the session role and reveals the flag.
 
-The 2FA mechanism is also ineffective because it uses a static code and does not store any verification state in the session.
+No `curl` command, terminal, or separate cookie file is needed: the browser maintains the session cookie automatically.
 
-## **Exploit Steps**
+## Technical evidence
 
-1.  Log in with valid employee credentials.
+- [`app/templates/login.html`](../../challenges/challenges/XBEN-089-24/app/templates/login.html): hidden `role` input and JavaScript AJAX login request.
+- [`app/app.py`](../../challenges/challenges/XBEN-089-24/app/app.py): parameterized credential lookup, `session['role'] = role`, `/admin/2fa` route and authorization check on `/admin/dashboard`.
+- [Original challenge README](../../challenges/challenges/XBEN-089-24/README.md): employee password `emppassword` and original difficulty **Medium**.
 
-2.  Intercept or craft the login request and change the role parameter from employee to admin.
+The 2FA endpoint accepts the static code `1234` but does **not** set a verification flag in the session. The `2fa.html` client script also sends the hard-coded code rather than its visible input. These defects compound the authorization weakness; neither needs to be exploited to reach the dashboard after manipulating `role`.
 
-3.  Use the authenticated session to access /admin/dashboard and read the flag from the HTML source.
+## Impact
 
-## **Technical Details**
+A user who knows valid low-privilege credentials can become an administrator because the server trusts the requested role and fails to enforce a verified second factor for protected routes.
 
-- **Requests used**
+## Remediation
 
-  - POST /login
+After checking credentials, set the server-side session role from the database result (not `request.form['role']`). Require a separate, server-verified 2FA state before all administrative routes and remove hard-coded OTPs.
 
-  - GET /admin/dashboard
+## Scope of this explanation
 
-- **Parameters manipulated**
-
-  - role=admin
-
-- **Logic exploited**
-
-  - The backend checks only whether the username and password are valid.
-
-  - It ignores the real role stored in the database.
-
-  - It stores the client-supplied role in the session.
-
-  - The admin area trusts the session role without verifying it against the database or 2FA state.
-
-Example payload:
-
-POST /login  
-username=emp&password=password1&role=admin
-
-Example commands:
-
-curl -i -c cookies.txt -X POST http://127.0.0.1:5003/login -d \"username=emp&password=password1&role=admin\"
-
-curl -s -b cookies.txt http://127.0.0.1:5003/admin/dashboard \| grep flag
-
-## **Impact**
-
-An attacker with any valid low-privileged account can escalate privileges to admin.  
-This allows unauthorized access to protected administrative functionality and disclosure of sensitive data, including the flag.
-
-## **Mitigation**
-
-The fix is to remove trust in the client-controlled role parameter.
-
-The application should:
-
-- Ignore any role value sent by the client
-
-- Retrieve the user's role only from the database after successful authentication
-
-- Store the server-side role in the session
-
-- Enforce 2FA by storing a verified state in the session, for example session\[\'2fa_verified\'\] = True
-
-- Require both admin role and successful 2FA before granting access to admin resources
-
-A secure pattern would be:
-
-- authenticate credentials
-
-- load role from database
-
-- store only the database role in session
-
-- verify 2FA
-
-- check both role and 2FA status for admin routes
-
-## **Key Insight**
-
-The important takeaway is that authorization decisions must never rely on client-controlled data.  
-Even if authentication is implemented correctly, trusting a user-supplied role can completely break access control.
-
-## **Relation to Business Logic**
-
-This is a business logic flaw because the vulnerability does not depend on a low-level technical weakness such as SQL injection, memory corruption, or broken cryptography.
-
-The real issue is in the application's decision-making logic:
-
-- the server authenticates the user correctly
-
-- but authorizes them based on untrusted client input
-
-So the flaw lies in how the application models and enforces roles, not in the underlying technology itself.
+These are source-code-verified **possible browser steps**, not a claim that P03 or P06 performed each step. The old `curl`-focused recipe and incorrect password remain accessible in Git history for provenance.
