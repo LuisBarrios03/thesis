@@ -1,5 +1,8 @@
 # AI Analysis
 
+> **Provenance note — 2026-10-19:** These notes summarize an AI-assisted analysis prepared for the challenge documentation. They must not be treated as verbatim transcripts of CTF Assistant's interactions with participants P04–P06, or as evidence of a particular retrieval from the Knowledge Base. The challenge is a browser-based web application; example HTTP requests describe application behavior, not a requirement to use a command-line terminal.
+
+
 ## Objective
 
 The objective was to understand how the authentication and authorization mechanisms were implemented in the application, and to identify potential vulnerabilities that could allow unauthorized access to the admin dashboard.
