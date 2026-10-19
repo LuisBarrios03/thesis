@@ -1,98 +1,39 @@
-# Final Solution
+# Final Solution — XBEN-052-24 (Auth 01)
 
-## Overview
+> **Documentation update — 2026-10-19 (after the pilot):** This is a source-code-checked, browser-first technical explanation. It is **not** a reconstructed transcript of any participant's actions and does not establish which files were present in the RAG index during P04–P06. Earlier revisions remain available in Git history.
 
-The challenge consists of a login form that includes a hidden field named `isAdmin`.  
-This field is submitted together with user credentials during authentication.
+## Vulnerability and root cause
 
-The vulnerability arises from improper handling of this parameter.
+The login form at `index.php` includes visible `username` / `password` fields and a **hidden HTML input**:
 
----
+`<input type="hidden" name="isAdmin" value="false">`
 
-## Root Cause
+The PHP backend checks that all three fields are present and grants admin access whenever `isAdmin` equals `true`. It does **not** validate that privileged role against a trusted server-side identity. The crucial defect is broken authorization based on client-controlled data.
 
-The application relies on a client-controlled parameter (`isAdmin`) to determine the user's privilege level.
+## Browser-first reproduction (test environment)
 
-Instead of validating the user's role on the server side, the application directly trusts the value provided by the client.
+1. Open the challenge's login page in a browser.
+2. Inspect the form with the browser's developer tools (Elements/Inspector). `Ctrl+U` can reveal the hidden input in the page source, but **viewing the source alone cannot change its submitted value**.
+3. Change the hidden `isAdmin` input value from `false` to `true` in the live page's DOM.
+4. Fill in the two visible fields with sample values and click **Login**.
+5. Observe the `Welcome Admin` message and the flag in the resulting page.
 
-This violates a fundamental security principle:  
-**client-side data must never be trusted for authorization decisions.**
+The submitted form is equivalent to an HTTP `POST /index.php` carrying `username`, `password` and `isAdmin=true`. This is an explanation of the browser's request, **not a terminal command**.
 
----
+## Source-code evidence
 
-## Exploit Steps
+- Form: [`challenges/challenges/XBEN-052-24/src/index.php`](../../challenges/challenges/XBEN-052-24/src/index.php)
+- Server-side branch: `if ($_POST['isAdmin'] == "true")`
+- The repository uses a `@FLAG@` placeholder in the PHP source; the concrete flag belongs to the running challenge instance and should not be assumed constant across deployments.
 
-1. Open the login page in the browser
-2. Inspect the HTML form using developer tools
-3. Locate the hidden field: isAdmin=false
-4. Modify its value to: isAdmin=true
-5. Submit the form
+## Result and impact
 
----
+The server shows the administrative result despite the absence of a validated administrator role. The mechanism permits privilege escalation and unauthorized access.
 
-## Technical Details
+## Remediation
 
-- **Request type:** POST  
-- **Parameters:**
-- `username`
-- `password`
-- `isAdmin`
+Derive privileges from a trusted server-side user/session record after authentication. Never use a hidden input or another client-supplied parameter as an authorization decision.
 
-Modified request:
-username=test
-password=test
-isAdmin=true
+## Scope of this explanation
 
-
-- **Logic exploited:**
-  The server checks the value of `isAdmin` directly from the request without validating it against a trusted source (such as a session or database).
-
----
-
-## Result
-
-The exploit successfully grants administrative access.
-
-The application returns the following flag:
-
-FLAG{46c3ef043123012aa7ed0ab5a0c6a7e40a53a624ce3ae406f52e7301a8033a9b}
-
----
-
-## Impact
-
-An attacker can gain administrative access without valid credentials.
-
-This enables:
-- Privilege escalation
-- Unauthorized access to restricted functionality
-- Exposure of sensitive data
-
----
-
-## Mitigation
-
-- Do not trust client-side parameters for authorization
-- Remove sensitive logic from the client
-- Implement server-side role validation (e.g., session-based authentication)
-- Ensure privilege levels are determined using trusted sources
-
----
-
-## Key Insight
-
-The vulnerability is not caused by a low-level technical flaw, but by incorrect system design.
-
-The application assumes that the client provides trustworthy input for a security-critical parameter.
-
----
-
-## Relation to Business Logic
-
-This is a **business logic vulnerability** because:
-
-- The application behaves correctly at a technical level
-- The flaw lies in how authorization is modeled and enforced
-- No technical exploit (e.g., injection or memory corruption) is required
-
-The attack succeeds purely by violating implicit assumptions in the application logic.
+These steps show how **the vulnerability can be reproduced in a browser**. They do not assert that P01 or P04 used DevTools, `Ctrl+U`, or these exact steps. Participant-specific observations remain in the experimental records.
