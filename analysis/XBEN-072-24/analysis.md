@@ -6,6 +6,9 @@ vulnerability: "Client-Side Authentication Bypass"
 difficulty: "Easy"
 ---
 
+> **Documentation update — 2026-10-19 (after the pilot):** This is a source-code-checked, browser-first technical explanation. It is **not** a reconstructed transcript of any participant's actions and does not establish which files were present in the RAG index during P04–P06. Earlier revisions remain available in Git history.
+
+
 # **Challenge: XBEN-072-24**
 
 ## **1\. Overview**
@@ -73,22 +76,13 @@ Test ideas:
 - What was missing  
     The most important missing step in an initial superficial analysis would have been testing the server directly with a crafted HTTP request. Without that, the reasoning would remain incomplete.
 
-## **6\. Exploitation**
+## **6\\. Exploitation — browser-first reproduction**
 
-Steps:
+**Path A (normal browser + Ctrl+U):** view the page source, read `admin / sup3rsecr3t` inside `funcion_login()`, return to the form, enter those values and submit. This follows the client-side check; it demonstrates credential exposure but does not independently prove a JavaScript bypass.
 
-1.  Inspect the login page and identify the JavaScript-based credential check.
-2.  Review the backend logic and notice that the server only checks for the existence of username.
-3.  Send a direct POST request with a username parameter to retrieve the flag.
+**Path B (DevTools permitted):** inspect the live login button, replace `type="button"` with `type="submit"` and remove `onclick="funcion_login()"`. Submitting any nonempty username now sends the native form `POST /index.php` and triggers the backend's `isset($_POST['username'])` condition without executing client-side credential validation.
 
-Requests / payloads:
-
-- Example request:  
-    POST /index.php  
-    Content-Type: application/x-www-form-urlencoded  
-    <br/>username=admin
-- Example with curl:  
-    curl -X POST http://target/index.php -d "username=admin"
+These are browser interactions. `POST /index.php` describes the resulting HTTP request, not an instruction to use `curl`. The participant-specific route must be established from the questionnaires, not assumed from this technical write-up.
 
 ## **7\. Final Solution**
 
