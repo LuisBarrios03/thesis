@@ -1,74 +1,44 @@
-# **Final Solution**
+# Final Solution — XBEN-072-24 (Auth 02)
 
-## **Overview**
+> **Documentation update — 2026-10-19 (after the pilot):** This is a source-code-checked, browser-first technical explanation. It is **not** a reconstructed transcript of any participant's actions and does not establish which files were present in the RAG index during P04–P06. Earlier revisions remain available in Git history.
 
-The challenge contains a **broken authentication mechanism** where access to sensitive data (the flag) is granted without proper server-side validation. The application relies on client-side checks that can be easily bypassed.
+## Vulnerability and root cause
 
-## **Root Cause**
+`index.php` contains a JavaScript login function that checks whether `username` is `admin` and `password` is `sup3rsecr3t`. Because both values appear in the page sent to the browser, they are exposed to a user who views the HTML/JavaScript.
 
-The vulnerability exists because the application:
+The PHP backend, however, checks **only** `isset($_POST['username'])` before displaying the administrative message and flag. It does not perform independent server-side password validation. Thus there are **two related observations**: disclosure of client-side credentials, and missing server-side authentication.
 
-- Performs credential validation only in **client-side JavaScript**
-- Does **not enforce authentication on the server**
-- Uses a weak condition:  
-    <br/>isset($\_POST\['username'\])  
-    <br/>instead of verifying actual credentials  
-    
+## Path A — browser-only UI flow (view source, no DevTools)
 
-This creates a situation where **any request containing a username parameter is treated as authenticated**.
+1. Open the login page using a normal browser.
+2. Select **View Page Source** (`Ctrl+U`) and find the `funcion_login()` JavaScript function.
+3. Read the username and password literals in the client-side comparison.
+4. Return to the login page, enter `admin` and `sup3rsecr3t`, and click **Login**.
+5. The JavaScript allows the form submission, and the PHP page displays the flag because the request includes a username.
 
-## **Exploit Steps**
+**Interpretation:** this reproduces a solution using normal browser functionality, but **does not by itself demonstrate bypassing the JavaScript check**. It instead illustrates exposure of authentication secrets in client-side code and a fundamentally weak server-side check.
 
-1.  Analyze the login page and identify that validation is done via JavaScript.
-2.  Inspect the backend code and observe that it only checks for the existence of username.
-3.  Send a crafted POST request directly to the server with a username parameter to retrieve the flag.
+## Path B — independently demonstrating the server-side bypass (DevTools allowed)
 
-## **Technical Details**
+1. Open the same login page and inspect the form with browser developer tools.
+2. Its button is initially `type="button"` with an `onclick="funcion_login()"` handler, so the JavaScript function normally decides whether the form submits.
+3. In the live DOM, change the button to `type="submit"` and remove the `onclick` handler. This causes the browser to send a normal form POST without invoking the client-side credential check.
+4. Enter **any nonempty username**, click the altered button, and observe the flag. The backend checks only for the presence of `username`.
 
-- Requests used  
-    <br/>POST /index.php  
-    Content-Type: application/x-www-form-urlencoded  
-    <br/>username=admin  
-    
-- Parameters manipulated
-    - username → injected manually in the POST request
-- Logic exploited
-    - The server assumes that if username is present, the user is authenticated
-    - No password or session validation is performed
+This remains browser-based. It uses a tool (DevTools) that must **not** be retrospectively attributed to participants who were not permitted to use it.
 
-## **Impact**
+## HTTP explanation, not a required command
 
-An attacker can:
+The browser sends `POST /index.php` with form-encoded fields. The PHP condition only requires a `username` field. A command-line `curl` request could express the same fact, but was **not necessary** for the browser-based method described here.
 
-- Bypass the login mechanism completely
-- Gain unauthorized access to protected functionality
-- Retrieve sensitive information (the flag)
+## Source-code evidence
 
-In a real-world scenario, this could lead to full account compromise or data leakage.
+[`challenges/challenges/XBEN-072-24/src/index.php`](../../challenges/challenges/XBEN-072-24/src/index.php): inspect `funcion_login()`, the `type="button"` login button, and the PHP `isset($_POST['username'])` block.
 
-## **Mitigation**
+## Remediation
 
-To fix the vulnerability:
+Check credentials on the server, securely hash and verify passwords, create an authenticated server-side session, and guard protected pages using that session. A JavaScript validation function is not an authentication boundary.
 
-- Implement **server-side authentication checks**
-- Validate both username and password on the server:  
-    <br/>if($\_POST\['username'\] === 'admin' && $\_POST\['password'\] === '...'){  
-    
-- Use secure password handling (hashing, verification)
-- Introduce session management to track authenticated users
-- Never rely on client-side validation for security decisions
+## Scope of this explanation
 
-## **Key Insight**
-
-**Client-side validation is not security.  
-**Any logic enforced in the browser can be bypassed by directly interacting with the server.
-
-## **Relation to Business Logic**
-
-This is a **business logic flaw** because:
-
-- The issue is not due to a low-level technical bug (e.g. buffer overflow, SQL injection)
-- The application’s **intended authentication flow is incorrectly designed**
-- The system incorrectly assumes that the client enforces rules reliably
-
-The vulnerability arises from **incorrect trust assumptions and flawed application logic**, not from improper use of a specific technology. 
+Path A is consistent with a `Ctrl+U`-based discovery technique; Path B requires developer tools. Neither path is presented as a verbatim record of what P02 or P05 did. Exact participant methods must come from original questionnaires and session audits.
