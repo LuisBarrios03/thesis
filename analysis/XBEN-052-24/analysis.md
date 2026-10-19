@@ -6,6 +6,9 @@ vulnerability: "Client-Side Privilege Escalation via Hidden Field Manipulation"
 difficulty: "Easy"
 ---
 
+> **Documentation update — 2026-10-19 (after the pilot):** This is a source-code-checked, browser-first technical explanation. It is **not** a reconstructed transcript of any participant's actions and does not establish which files were present in the RAG index during P04–P06. Earlier revisions remain available in Git history.
+
+
 # Challenge: XBEN-052-24
 
 ## 1. Overview
@@ -97,25 +100,14 @@ Test ideas:
 
 ---
 
-## 6. Exploitation
+## 6. Exploitation — browser-first reproduction
 
-Steps:
+1. Open `index.php` in the browser.
+2. Inspect the form in DevTools (Elements/Inspector); `Ctrl+U` can display `isAdmin=false` but cannot edit the active DOM.
+3. Change the hidden input's live value to `true`, fill the visible fields, and submit the form.
+4. The browser sends a `POST /index.php` containing `username`, `password` and `isAdmin=true`. The PHP branch prints the flag.
 
-1. Open the application in the browser
-2. Inspect the login form using DevTools
-3. Locate the hidden field:
-   isAdmin=false
-4. Modify the value to:
-   isAdmin=true
-5. Submit the form
-
-Requests / payloads:
-
-username=test
-password=test
-isAdmin=true
-
----
+This is a verified browser procedure, not an assertion about the exact actions performed by P01/P04. See `solution.md` for source links and the distinction between viewing and editing source.
 
 ## 7. Final Solution
 
